@@ -1,63 +1,103 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.19;
 
 contract Battleships {
 	
-	struct Player {
-		address player;
+	struct PlayerState {
 		string[] moves;
 		string[] hits;
 		uint boardHash;
-		string board;
+		uint[10] boardPositions;
+		string salt;
 	}
 
 	struct Game {
-    Player playerOne;
-		Player playerTwo;
-		string gameState; // States: open, loading, inRound, waitingEvaluation, gg
+		address playerOne;
+		address playerTwo;
+    
+		uint playerOneStateId;
+		uint playerTwoStateId;
+		
+		string gameState; // States: OPEN, LOADING, INROUND, WAITINGEVAL, GG
 		address winner;
   }
 
 	event NewGameAvailableEvent(uint _gameId);
 	event GameJoinedEvent(uint _gameId);
 
+	uint public maxBoardSize = 10;
+
 	Game[] public games;
+	PlayerState[] public playerStates;
+
 	mapping(address => uint[]) public playerGames;
 
 	function createGame() public returns(uint) {
-		// TODO Lockup funds
 		
-		Player memory pO = Player(msg.sender,new string[](0),new string[](0),0,"");
-		Player memory pT = Player(0x00000000,new string[](0),new string[](0),0,"");
-		Game memory newGame = Game(pO,pT,"open", 0x00000000);
-		
-		newGame.gameState = "open";
-		newGame.playerOne.player = msg.sender; 
+		PlayerState memory playerOneState = PlayerState(new string[](0),new string[](0),0,"");
+		PlayerState memory playerTwoState = PlayerState(new string[](0),new string[](0),0,"");
+
+		uint playerOneStateId = playerStates.push(playerOneState);
+		uint playerTwoStateId = playerStates.push(playerTwoState);
+
+		Game memory newGame = Game(msg.sender, 0x00000000, playerOneStateId,playerTwoStateId,"OPEN", 0x00000000);
 
 		uint gameId = games.push(newGame);
 		playerGames[msg.sender].push(gameId);
-		emit NewGameAvailableEvent(gameId);
+		
+		NewGameAvailableEvent(gameId);
 		return gameId;
 	}
 
-	function joinGame(uint _gameId) {
+	function joinGame(uint _gameId) public {
 		
-		require(keccak256(games[_gameId].gameState) == keccak256("open"));
+		require(keccak256(games[_gameId].gameState) == keccak256("OPEN"));
 		
 		Game storage game = games[_gameId];
-		game.playerTwo.player = msg.sender;
-		game.gameState = "loading";
+		game.playerTwo = msg.sender;
+		game.gameState = "LOADING";
 
-		emit GameJoinedEvent(_gameId);
+		GameJoinedEvent(_gameId);
 	}
 
-	function getHash(string board) public pure returns(uint) {
-		return uint(keccak256(board));
+	function updateLoadingState(uint _gameId, uint _boardHash) public {
+		require(keccak256(games[_gameId].gameState) == keccak256("LOADING"));
 	}
 
+	// A position must be between zero and 99
+	function getHash(string _salt, uint[10] _positions) public pure returns(uint) {
+		
+		uint hash = uint(keccak256(_salt));
 
-	// function getWinner(Player playerOne, Player playerTwo) private returns(address, string) {
-	// 	return 
-	// }
+		for ( uint i = 0; i < _positions.length; i++) {
+			hash = uint(keccak256(hash + _positions[i]));
+		}
 
+		return hash;
+	}
+
+	function testBoardValidity(uint[10] _positions) public pure returns(bool) {
+
+		uint maxPosition = (maxBoardSize * maxBoardSize) - 1;
+
+		for ( uint i = 0; i < _positions.length; i++) {
+			uint count = 0;
+			
+			if (_positions[i] > maxPosition) {
+				return false;
+			}
+
+			for ( uint j = 0; i < _positions.length; i++) {
+				if (_positions[i] == _positions[j]) {
+					count++;
+				}
+			}
+
+			if (count != 1) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 
 }
