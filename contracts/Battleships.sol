@@ -23,7 +23,7 @@ contract Battleships is Ownable {
 
 		string gameState;
 		address winner;
-		uint outcome;
+		string outcome;
 		uint bet;
   }
 
@@ -37,7 +37,7 @@ contract Battleships is Ownable {
 	// ==============================================================================================
 	// GAME PARAMETERS 
 	// ==============================================================================================
-	uint constant public MAX_BAORD_SIZE = 10;
+	uint constant public MAX_BOARD_SIZE = 10;
 	uint constant public MAX_GAME_LENGHT_IN_ROUNDS = 30;
 	uint constant public MAX_WAIT_TIME_IN_MINUTES = 12 * 60 * 1 minutes;
   
@@ -75,7 +75,7 @@ contract Battleships is Ownable {
 
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _bet - 
 	function createGame(uint _bet) payable public returns(uint) {
 		
@@ -108,7 +108,7 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _gameId - 
 	function joinGame(uint _gameId) payable public {
 		
@@ -130,7 +130,7 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _gameId - 
 	/// @param _boardHash - 
 	function updateLoadingState(uint _gameId, uint _boardHash) public onlyGamePlayers(_gameId) {
@@ -153,7 +153,7 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _gameId - 
 	function cancelNewGame(uint _gameId) public onlyGameOwner(_gameId) {
 		require(keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_OPEN));
@@ -173,7 +173,7 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _salt - 
 	/// @param _positions - 
 	function getHash(string _salt, uint[10] _positions) public pure returns(uint) {
@@ -188,11 +188,11 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _positions - 
-	function testBoardValidity(uint[10] _positions) public view returns(bool) {
+	function testBoardValidity(uint[10] _positions) public pure returns(bool) {
 
-		uint maxPosition = (MAX_BAORD_SIZE * MAX_BAORD_SIZE) - 1;
+		uint maxPosition = (MAX_BOARD_SIZE * MAX_BOARD_SIZE) - 1;
 
 		for ( uint i = 0; i < _positions.length; i++) {
 			uint count = 0;
@@ -233,7 +233,7 @@ contract Battleships is Ownable {
 		return _amount * cut / 10000;
 	}
 
-	/// @ dev 
+	/// @dev 
 	/// @param _amount - 
 	function _payToTournamentFund(uint _amount) internal {
 		balanceOf[tournamentFundAddress] += _amount;
@@ -244,15 +244,11 @@ contract Battleships is Ownable {
 	// MODIFIERS
 	// ==============================================================================================
 
-	/// @ dev 
-	/// @param _gameId - 
 	modifier onlyGameOwner(uint _gameId) {
 		require(games[_gameId].playerOne == msg.sender);
 		_;
 	}
 
-	/// @ dev 
-	/// @param _gameId - 
 	modifier onlyGamePlayers(uint _gameId) {
 		require(games[_gameId].playerOne == msg.sender || games[_gameId].playerTwo == msg.sender);
 		_;
@@ -263,7 +259,7 @@ contract Battleships is Ownable {
 	// ==============================================================================================
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _newAddress - 
 	function setTournamentFundAddress(address _newAddress) public onlyOwner {
 		uint amount = balanceOf[tournamentFundAddress];
@@ -272,7 +268,7 @@ contract Battleships is Ownable {
 	}
 
 	/// @notice
-	/// @ dev 
+	/// @dev 
 	/// @param _to - 
 	function withdrawTournamentFunds(address _to) public onlyOwner {
 		uint amount = balanceOf[tournamentFundAddress];
