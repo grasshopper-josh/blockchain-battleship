@@ -6,6 +6,7 @@ contract Battleboats is Ownable {
   
   struct PlayerState {
     uint[] attacks;
+    uint[] hits;
     uint boardHash;
     uint[10] boatPositions;
     string salt;
@@ -19,9 +20,10 @@ contract Battleboats is Ownable {
     uint playerTwoStateId;
     
     uint round;
-    uint roundStarted;
 
+    uint stateStarted;
     string gameState;
+
     address winner;
     string outcome;
     uint bet;
@@ -76,8 +78,7 @@ contract Battleboats is Ownable {
   // GAME EVENTS
   // ==============================================================================================
   event GameCreatedEvent(uint _gameId, uint _bet);
-  event GameJoinedEvent(uint _gameId);
-  event GameRoundStartedEvent(uint _gameId);
+  event GameAttackStartedEvent(uint _gameId);
   event GameEvalStartedEvent(uint _gameId);
   event GameCancelledEvent(uint _gameId);
 
@@ -106,7 +107,7 @@ contract Battleboats is Ownable {
       playerOneStateId: playerOneStateId,
       playerTwoStateId: 0,
       round:0,
-      roundStarted: now,
+      stateStarted: now,
       gameState: GAME_STATE_OPEN,
       winner: 0x00000000,
       outcome: GAME_OUTCOME_EMPTY,
@@ -145,11 +146,12 @@ contract Battleboats is Ownable {
     game.playerTwo = msg.sender;
     game.playerTwoStateId = playerTwoStateId;
     game.gameState = GAME_STATE_ATTACK;
+    game.stateStarted = now;
 
     playerGames[msg.sender].push(_gameId);
     balanceOf[msg.sender] += msg.value;
 
-    GameJoinedEvent(_gameId);
+    GameAttackStartedEvent(_gameId);
   }
 
   /// @notice Cancel a game to release funds. A 1% cancellation fee with be charged, which
@@ -179,7 +181,7 @@ contract Battleboats is Ownable {
   /// one attack per round :) Invalid positions will be recorded, but not taken into account
   /// during the scoring round.
   /// 
-  /// @dev
+  /// @dev dev
   ///
   /// @param _gameId - GameId for game that will be cancelled
   /// @param _attackPosition - GameId for game that will be cancelled
@@ -187,16 +189,16 @@ contract Battleboats is Ownable {
     uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
     
     require(
-      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK) ||
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P2));
 
-    // Save to assume palyer is either 1 or 2, thanks to onlyGamePlayers modifier
+    // Safe to assume player is either 1 or 2, thanks to onlyGamePlayers modifier
     string memory stateUpdate;
     uint playerStateId;
     bool playerHasAttack = playerStates[playerStateId].attacks.length < games[_gameId].round;
 
-    if(player == 1) {
+    if (player == 1) {
       stateUpdate = GAME_STATE_ATTACK_WAITING_P2;
       playerStateId = games[_gameId].playerOneStateId;
     } else {
@@ -204,48 +206,70 @@ contract Battleboats is Ownable {
       playerStateId = games[_gameId].playerTwoStateId;      
     }
 
-    if(playerHasAttack) {      
+    if (playerHasAttack) {
 
       playerStates[playerStateId].attacks.push(_attackPosition);
 
-      if(keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
+      if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
         games[_gameId].gameState = stateUpdate;
       } else {
         games[_gameId].gameState = GAME_STATE_EVAL;
+        games[_gameId].stateStarted = now;
         GameEvalStartedEvent(_gameId);
       }
     }
     
   }
 
-  /// @notice
+  /// @notice notice
   /// 
   /// @param _gameId - GameId for game that will be cancelled
   /// @param _attackPosition - GameId for game that will be cancelled
   /// @param _hit - GameId for game that will be cancelled
+  function evaluateAttack(uint _gameId, uint _attackPosition, bool _hit) public onlyGamePlayers(_gameId) {
+    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
+    
+    require(
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL) || 
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P1) ||
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2));
+    
+    uint playerStateId;
 
-  // function evaluateAttack(uint _gameId, uint _attackPosition, bool _hit) public onlyGamePlayers(_gameId) {
-  // }
+    if (player == 1 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_EVAL_WAITING_P2)) {
+      games[_gameId].gameState = GAME_STATE_EVAL_WAITING_P2;
+      playerStateId = games[_gameId].playerTwoStateId;
+      
+      if (_hit) {
+        playerStates[playerStateId].hits.push(_attackPosition);
+      }
+
+    } else if (player == 2 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_EVAL_WAITING_P1)) {
+      games[_gameId].gameState = GAME_STATE_EVAL_WAITING_P1;
+      playerStateId = games[_gameId].playerOneStateId;
+      
+      if (_hit) {
+        playerStates[playerStateId].hits.push(_attackPosition);
+      }
+
+    } else {
+      games[_gameId].gameState = GAME_STATE_ATTACK;
+      games[_gameId].stateStarted = now;
+      GameAttackStartedEvent(_gameId);
+    }
+
+  }
 
 
   // ==============================================================================================
   // GAME FORWARDERS
   // ==============================================================================================
 
-  /// @notice 
-  /// 
-  /// @param _gameId - GameId for game that will be cancelled
   // function forfeit(uint _gameId) public onlyGamePlayers(_gameId) {
-
   // }
 
-  /// @notice 
-  /// 
-  /// @param _gameId - GameId for game that will be cancelled
   // function forceQuit(uint _gameId) public onlyGamePlayers(_gameId) {
-
   // }
-
 
 
   // ==============================================================================================
@@ -321,14 +345,14 @@ contract Battleboats is Ownable {
     return _amount * cut / 10000;
   }
 
-  /// @dev 
+  /// @dev NOTES HERE
   /// @param _amount - 
   function _payToTournamentFund(uint _amount) internal {
     balanceOf[tournamentFundAddress] += _amount;
     tournamentFund += _amount;
   }
 
-  /// @dev 
+  /// @dev Notes here
   /// @param _gameId - 
   /// @param _player - 
   function _playerOneOrplayerTwo(uint _gameId, address _player) internal view returns (uint) {
@@ -361,8 +385,8 @@ contract Battleboats is Ownable {
   // ONLYOWNER
   // ==============================================================================================
 
-  /// @notice
-  /// @dev 
+  /// @notice notice
+  /// @dev dev
   /// @param _newAddress - 
   function setTournamentFundAddress(address _newAddress) public onlyOwner {
     uint amount = balanceOf[tournamentFundAddress];
@@ -370,8 +394,8 @@ contract Battleboats is Ownable {
     balanceOf[_newAddress] = amount;
   }
 
-  /// @notice
-  /// @dev 
+  /// @notice notice
+  /// @dev dev
   /// @param _to - 
   function withdrawTournamentFunds(address _to) public onlyOwner {
     uint amount = balanceOf[tournamentFundAddress];
