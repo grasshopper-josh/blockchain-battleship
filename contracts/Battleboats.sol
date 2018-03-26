@@ -227,7 +227,8 @@ contract Battleboats is Ownable {
     
   }
 
-  /// @notice notice
+  /// @notice Give feedback on the previous attack, lying will catch up with you, not sure how
+  /// but I'm sure it will.
   /// 
   /// @param _gameId - GameId for game that will be cancelled
   /// @param _attackPosition - GameId for game that will be cancelled
@@ -240,42 +241,64 @@ contract Battleboats is Ownable {
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2));
     
+    // Safe to assume player is either 1 or 2, thanks to onlyGamePlayers modifier
+    string memory stateUpdate;
     uint playerStateId;
 
-    if (player == 1 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_EVAL_WAITING_P2)) {
-      games[_gameId].gameState = GAME_STATE_EVAL_WAITING_P2;
-      playerStateId = games[_gameId].playerTwoStateId;
-      
-      if (_hit) {
-        playerStates[playerStateId].hits.push(_attackPosition);
-      }
-
-    } else if (player == 2 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_EVAL_WAITING_P1)) {
-      games[_gameId].gameState = GAME_STATE_EVAL_WAITING_P1;
+    if (player == 1) {
+      stateUpdate = GAME_STATE_EVAL_WAITING_P2;
       playerStateId = games[_gameId].playerOneStateId;
-      
-      if (_hit) {
-        playerStates[playerStateId].hits.push(_attackPosition);
-      }
+    } else {
+      stateUpdate = GAME_STATE_EVAL_WAITING_P1;
+      playerStateId = games[_gameId].playerTwoStateId;      
+    }
+
+    if (_hit) {
+      playerStates[playerStateId].hits.push(_attackPosition);
+    }
+
+    if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
+      games[_gameId].gameState = stateUpdate;
+    } else if (_isGameFinished(_gameId)) {
+
+      games[_gameId].gameState = GAME_STATE_REVEAL;
+      games[_gameId].stateStarted = now;
+      GameRevealStartedEvent(_gameId);
 
     } else {
-      
-      games[_gameId].stateStarted = now;
-      games[_gameId].round++;
-      
-      if (!_isGameFinished(_gameId)) {
-        
-        games[_gameId].gameState = GAME_STATE_ATTACK;
-        GameAttackStartedEvent(_gameId);
 
-      } else {
-        games[_gameId].gameState = GAME_STATE_REVEAL;
-        GameRevealStartedEvent(_gameId);
-      }
+      games[_gameId].gameState = GAME_STATE_ATTACK;
+      games[_gameId].stateStarted = now;
+      GameAttackStartedEvent(_gameId);(_gameId);
     }
+
 
   }
 
+  function revealPositions(uint _gameId, string _salt, uint[10] _positions) public onlyGamePlayers(_gameId) {
+    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
+    
+    require(
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL) || 
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P1) ||
+      keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2));
+    
+    uint playerStateId;
+
+    if (player == 1 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_REVEAL_WAITING_P2)) {
+      games[_gameId].gameState = GAME_STATE_REVEAL_WAITING_P1;
+      playerStateId = games[_gameId].playerTwoStateId;
+
+    } else if (player == 2 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_REVEAL_WAITING_P1)) {
+      games[_gameId].gameState = GAME_STATE_REVEAL_WAITING_P2;
+      playerStateId = games[_gameId].playerOneStateId;
+
+    } else {
+      
+      // Get results
+      
+    }
+  }
 
   // ==============================================================================================
   // GAME FORWARDERS
