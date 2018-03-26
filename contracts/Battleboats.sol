@@ -57,6 +57,10 @@ contract Battleboats is Ownable {
   string constant GAME_STATE_EVAL_WAITING_P1 = "EVAL_WAITING_P1";
   string constant GAME_STATE_EVAL_WAITING_P2 = "EVAL_WAITING_P2";
 
+  string constant GAME_STATE_REVEAL = "REVEAL";
+  string constant GAME_STATE_REVEAL_WAITING_P1 = "REVEAL_WAITING_P1";
+  string constant GAME_STATE_REVEAL_WAITING_P2 = "REVEAL_WAITING_P2";
+
   string constant GAME_STATE_GG = "GG";
 
   string constant GAME_OUTCOME_EMPTY = "EMPTY";
@@ -73,6 +77,7 @@ contract Battleboats is Ownable {
   address tournamentFundAddress = 0x00000000;
   uint public tournamentFund = 0;
   mapping(address => uint256) public balanceOf;
+  mapping(address => uint256) public balanceOfWinnings;
 
   // ==============================================================================================
   // GAME EVENTS
@@ -80,6 +85,7 @@ contract Battleboats is Ownable {
   event GameCreatedEvent(uint _gameId, uint _bet);
   event GameAttackStartedEvent(uint _gameId);
   event GameEvalStartedEvent(uint _gameId);
+  event GameRevealStartedEvent(uint _gameId);
   event GameCancelledEvent(uint _gameId);
 
 
@@ -253,9 +259,19 @@ contract Battleboats is Ownable {
       }
 
     } else {
-      games[_gameId].gameState = GAME_STATE_ATTACK;
+      
       games[_gameId].stateStarted = now;
-      GameAttackStartedEvent(_gameId);
+      games[_gameId].round++;
+      
+      if (!_isGameFinished(_gameId)) {
+        
+        games[_gameId].gameState = GAME_STATE_ATTACK;
+        GameAttackStartedEvent(_gameId);
+
+      } else {
+        games[_gameId].gameState = GAME_STATE_REVEAL;
+        GameRevealStartedEvent(_gameId);
+      }
     }
 
   }
@@ -331,6 +347,15 @@ contract Battleboats is Ownable {
   // ==============================================================================================
   // PRIVATE METHODS
   // ==============================================================================================
+
+  /// @dev Dev comment here
+  /// @param _gameId - game to finish off
+  function _isGameFinished(uint _gameId) internal view returns (bool) {
+    Game memory game = games[_gameId];
+    uint playerOneStateId = game.playerOneStateId;
+    uint playerTwoStateId = game.playerTwoStateId;
+    return game.round == MAX_GAME_LENGHT_IN_ROUNDS || playerStates[playerOneStateId].hits.length == 10 || playerStates[playerTwoStateId].hits.length == 10;
+  }
 
   /// @dev Computes cut
   /// @param _amount - Sale price of NFT.
