@@ -10,6 +10,8 @@ contract Battleboats is Ownable {
     uint boardHash;
     uint[10] boatPositions;
     string salt;
+    uint score;
+    bool cheated;
   }
 
   struct Game {
@@ -257,10 +259,12 @@ contract Battleboats is Ownable {
       playerStates[playerStateId].hits.push(_attackPosition);
     }
 
+    
     if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
+      // First player is doing an eval
       games[_gameId].gameState = stateUpdate;
     } else if (_isGameFinished(_gameId)) {
-
+      
       games[_gameId].gameState = GAME_STATE_REVEAL;
       games[_gameId].stateStarted = now;
       GameRevealStartedEvent(_gameId);
@@ -283,21 +287,31 @@ contract Battleboats is Ownable {
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2));
     
+    string memory stateUpdate;
     uint playerStateId;
 
-    if (player == 1 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_REVEAL_WAITING_P2)) {
-      games[_gameId].gameState = GAME_STATE_REVEAL_WAITING_P1;
-      playerStateId = games[_gameId].playerTwoStateId;
-
-    } else if (player == 2 && keccak256(games[_gameId].gameState) != keccak256(GAME_STATE_REVEAL_WAITING_P1)) {
-      games[_gameId].gameState = GAME_STATE_REVEAL_WAITING_P2;
+    if (player == 1) {
+      stateUpdate = GAME_STATE_REVEAL_WAITING_P1;
       playerStateId = games[_gameId].playerOneStateId;
 
     } else {
-      
-      // Get results
-      
+      stateUpdate = GAME_STATE_REVEAL_WAITING_P2;
+      playerStateId = games[_gameId].playerTwoStateId;
     }
+
+    playerStates[playerStateId].salt = _salt;
+    playerStates[playerStateId].boatPositions = _positions;
+    playerStates[playerStateId].cheated = _playerCheated(playerStateId);
+
+
+    if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL)) {
+      games[_gameId].gameState = stateUpdate;
+    } else {
+    
+      // Deteremine winner
+
+    }
+
   }
 
   // ==============================================================================================
@@ -378,6 +392,27 @@ contract Battleboats is Ownable {
     uint playerOneStateId = game.playerOneStateId;
     uint playerTwoStateId = game.playerTwoStateId;
     return game.round == MAX_GAME_LENGHT_IN_ROUNDS || playerStates[playerOneStateId].hits.length == 10 || playerStates[playerTwoStateId].hits.length == 10;
+  }
+
+  /// @dev Checks if the supplied salt and boat positions matches the hash
+  /// supplied during the game join.
+  ///
+  /// @param _playerStateId - The state to test for cheating
+  function _playerCheated(uint _playerStateId) internal view returns (bool) {
+
+    PlayerState memory playerState = playerStates[_playerStateId];
+
+    uint boardHash = getHash(playerState.salt, playerState.boatPositions);
+
+    return boardHash != playerState.boardHash;
+  }
+
+    /// @dev Checks if the supplied salt and boat positions matches the hash
+  /// supplied during the game join.
+  ///
+  /// @param _playerStateId - The state to test for cheating
+  function _playerScores(uint _gameId) internal view returns (uint, uint) {
+    return (10,10);
   }
 
   /// @dev Computes cut
