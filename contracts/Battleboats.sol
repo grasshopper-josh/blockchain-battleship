@@ -1,36 +1,11 @@
 pragma solidity ^0.4.19;
 
 import "./Ownable.sol";
+import "./BattleboatsStates.sol";
+import "./BattleboatsEnums.sol";
 
-contract Battleboats is Ownable {
+contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   
-  struct PlayerState {
-    uint[] attacks;
-    uint[] hits;
-    uint boardHash;
-    uint[10] boatPositions;
-    string salt;
-    uint score;
-    bool cheated;
-  }
-
-  struct Game {
-    address playerOne;
-    address playerTwo;
-    
-    uint playerOneStateId;
-    uint playerTwoStateId;
-    
-    uint round;
-
-    uint stateStarted;
-    string gameState;
-
-    address winner;
-    string outcome;
-    uint bet;
-  }
-
   // ==============================================================================================
   // GAME STATE
   // ==============================================================================================
@@ -38,40 +13,6 @@ contract Battleboats is Ownable {
   PlayerState[] public playerStates;
   mapping(address => uint[]) public playerGames;
 
-  // ==============================================================================================
-  // GAME PARAMETERS 
-  // ==============================================================================================
-  uint constant public MAX_BOARD_SIZE = 10;
-  uint constant public MAX_GAME_LENGHT_IN_ROUNDS = 30;
-  uint constant public MAX_WAIT_TIME_IN_MINUTES = 12 * 60 * 1 minutes;
-  
-  uint constant public TOURNAMENT_FEE = 3;
-  uint constant public CANCELLATION_FEE = 1;
-
-  string constant GAME_STATE_OPEN = "OPEN";
-  string constant GAME_STATE_CANCELLED = "CANCELLED";
-
-  string constant GAME_STATE_ATTACK = "ATTACK";
-  string constant GAME_STATE_ATTACK_WAITING_P1 = "ATTACK_WAITING_P1";
-  string constant GAME_STATE_ATTACK_WAITING_P2 = "ATTACK_WAITING_P2";
-
-  string constant GAME_STATE_EVAL = "EVAL";
-  string constant GAME_STATE_EVAL_WAITING_P1 = "EVAL_WAITING_P1";
-  string constant GAME_STATE_EVAL_WAITING_P2 = "EVAL_WAITING_P2";
-
-  string constant GAME_STATE_REVEAL = "REVEAL";
-  string constant GAME_STATE_REVEAL_WAITING_P1 = "REVEAL_WAITING_P1";
-  string constant GAME_STATE_REVEAL_WAITING_P2 = "REVEAL_WAITING_P2";
-
-  string constant GAME_STATE_GG = "GG";
-
-  string constant GAME_OUTCOME_EMPTY = "EMPTY";
-  string constant GAME_OUTCOME_WIN = "WIN";
-  string constant GAME_OUTCOME_WIN_BY_DEFAULT = "WIN_BY_DEFAULT";
-  string constant GAME_OUTCOME_WIN_BY_CHEAT = "WIN_BY_CHEAT";
-  string constant GAME_OUTCOME_DRAW = "OPEN";
-  string constant GAME_OUTCOME_BOTH_CHEAT = "BOTH_CHEAT";
-  
 
   // ==============================================================================================
   // GAME FINANCES
@@ -79,7 +20,7 @@ contract Battleboats is Ownable {
   address tournamentFundAddress = 0x00000000;
   uint public tournamentFund = 0;
   mapping(address => uint256) public balanceOf;
-  mapping(address => uint256) public balanceOfWinnings;
+  mapping(address => uint256) public balanceOfClaimableFunds;
 
   // ==============================================================================================
   // GAME EVENTS
@@ -88,6 +29,7 @@ contract Battleboats is Ownable {
   event GameAttackStartedEvent(uint _gameId);
   event GameEvalStartedEvent(uint _gameId);
   event GameRevealStartedEvent(uint _gameId);
+  event GoodGameEvent(uint _gameId);
   event GameCancelledEvent(uint _gameId);
 
 
@@ -172,12 +114,7 @@ contract Battleboats is Ownable {
     uint amount = games[_gameId].bet;
     
     if (amount > 0) {
-
-      uint cancellationFee = _computeCut(amount, CANCELLATION_FEE);
-      msg.sender.transfer(amount - cancellationFee);
-      balanceOf[msg.sender] -= amount;
-      _payToTournamentFund(cancellationFee);
-
+      _payoutFunds(msg.sender, msg.sender, amount, CANCELLATION_FEE);
     }
 
     games[_gameId].gameState = GAME_STATE_CANCELLED;
@@ -200,6 +137,13 @@ contract Battleboats is Ownable {
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P2));
+
+      // Short-circuit
+    if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P2))
+      return;
+
+    if (player == 2 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P1))
+      return;
 
     // Safe to assume player is either 1 or 2, thanks to onlyGamePlayers modifier
     string memory stateUpdate;
@@ -242,7 +186,16 @@ contract Battleboats is Ownable {
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2));
-    
+
+
+    // Short-circuit
+    if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2))
+      return;
+
+    if (player == 2 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P1))
+      return;
+
+
     // Safe to assume player is either 1 or 2, thanks to onlyGamePlayers modifier
     string memory stateUpdate;
     uint playerStateId;
@@ -287,6 +240,14 @@ contract Battleboats is Ownable {
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2));
     
+
+    // Short-circuit
+    if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2))
+      return;
+
+    if (player == 2 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P1))
+      return;
+
     string memory stateUpdate;
     uint playerStateId;
 
@@ -305,11 +266,67 @@ contract Battleboats is Ownable {
 
 
     if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL)) {
+      
       games[_gameId].gameState = stateUpdate;
+
     } else {
     
-      // Deteremine winner
+      PlayerState storage playerOneState = playerStates[games[_gameId].playerOneStateId];
+      PlayerState storage playerTwoState = playerStates[games[_gameId].playerTwoStateId];
 
+      if (playerOneState.cheated && playerTwoState.cheated) {
+        games[_gameId].outcome = GAME_OUTCOME_TOTAL_LOSS;
+        games[_gameId].winner = tournamentFundAddress;
+
+        _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOTAL_LOSS);
+        _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOTAL_LOSS);
+
+      } else if (playerOneState.cheated ) {
+        games[_gameId].outcome = GAME_OUTCOME_WIN;
+        games[_gameId].winner = games[_gameId].playerTwo;
+
+        _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+        _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+
+      }else if (playerTwoState.cheated) {
+        games[_gameId].outcome = GAME_OUTCOME_WIN;
+        games[_gameId].winner = games[_gameId].playerOne;
+
+        _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+        _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+
+      } else {
+
+        playerOneState.score = _playerScore(playerOneState, playerTwoState);
+        playerTwoState.score = _playerScore(playerTwoState, playerOneState);
+
+        if (playerOneState.score > playerTwoState.score) {
+
+          games[_gameId].outcome = GAME_OUTCOME_WIN;
+          games[_gameId].winner = games[_gameId].playerOne;
+
+          _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+          _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+
+        } else if (playerOneState.score < playerTwoState.score) {
+
+          games[_gameId].outcome = GAME_OUTCOME_WIN;
+          games[_gameId].winner = games[_gameId].playerTwo;
+
+          _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+          _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
+
+        } else {
+
+          games[_gameId].outcome = GAME_OUTCOME_DRAW;
+
+          _payoutFunds(games[_gameId].playerOne, games[_gameId].playerOne, games[_gameId].bet, TOURNAMENT_FEE);
+          _payoutFunds(games[_gameId].playerTwo, games[_gameId].playerTwo, games[_gameId].bet, TOURNAMENT_FEE);
+        }
+      }
+      
+      games[_gameId].gameState = GAME_STATE_GG;
+      GoodGameEvent(_gameId);
     }
 
   }
@@ -381,6 +398,15 @@ contract Battleboats is Ownable {
   }
 
 
+  function claimFunds() public {
+    uint amount = balanceOfClaimableFunds[msg.sender];
+
+    if (amount > 0) {
+      msg.sender.transfer(amount);
+      balanceOfClaimableFunds[msg.sender] -= amount;
+    }
+  }
+
   // ==============================================================================================
   // PRIVATE METHODS
   // ==============================================================================================
@@ -403,16 +429,62 @@ contract Battleboats is Ownable {
     PlayerState memory playerState = playerStates[_playerStateId];
 
     uint boardHash = getHash(playerState.salt, playerState.boatPositions);
+    bool boardValid = testBoardValidity(playerState.boatPositions);
 
-    return boardHash != playerState.boardHash;
+    return boardHash != playerState.boardHash || !boardValid;
   }
 
-    /// @dev Checks if the supplied salt and boat positions matches the hash
+  /// @dev Checks if the supplied salt and boat positions matches the hash
   /// supplied during the game join.
   ///
-  /// @param _playerStateId - The state to test for cheating
-  function _playerScores(uint _gameId) internal view returns (uint, uint) {
-    return (10,10);
+  /// @param _thisPlayer - The state of the player you need the score for
+  /// @param _otherPlayer - The state of other player, for reference
+  function _playerScore(PlayerState _thisPlayer, PlayerState _otherPlayer) internal pure returns (uint) {
+
+    uint score = 0;
+
+    uint boatPostionIndex = 0;
+    uint attackPostionIndex = 0;
+    uint hitPostionIndex = 0;
+
+    for (boatPostionIndex = 0; boatPostionIndex < 10; boatPostionIndex++) {
+      
+      for (attackPostionIndex = 0; attackPostionIndex < _thisPlayer.attacks.length; attackPostionIndex++) {
+        if (_otherPlayer.boatPositions[boatPostionIndex] == _thisPlayer.attacks[attackPostionIndex]) {
+          score++;
+
+          bool foundHit = false;
+
+          for (hitPostionIndex = 0; hitPostionIndex < _thisPlayer.hits.length; hitPostionIndex++) {
+            if (_otherPlayer.boatPositions[boatPostionIndex] == _thisPlayer.hits[hitPostionIndex]) {
+              foundHit = true;
+              break;
+            }
+          }
+
+          if (!foundHit) {
+            score++;
+          }
+
+          break;
+        }
+      }
+    }
+
+    return score;
+  }
+
+  function _payoutFunds(address _from, address _to, uint _amount, uint _cut) internal {
+      
+      require(balanceOf[_from] >= _amount);           
+      
+      uint fee = _computeCut(_amount, _cut);
+      uint payout = _amount - fee;
+      
+      require(balanceOfClaimableFunds[_to] + payout >= balanceOfClaimableFunds[_to]); 
+      balanceOf[_from] -= _amount;
+      balanceOf[tournamentFundAddress] += fee;
+      balanceOfClaimableFunds[_to] += _amount;
   }
 
   /// @dev Computes cut
@@ -428,12 +500,6 @@ contract Battleboats is Ownable {
     return _amount * cut / 10000;
   }
 
-  /// @dev NOTES HERE
-  /// @param _amount - 
-  function _payToTournamentFund(uint _amount) internal {
-    balanceOf[tournamentFundAddress] += _amount;
-    tournamentFund += _amount;
-  }
 
   /// @dev Notes here
   /// @param _gameId - 
