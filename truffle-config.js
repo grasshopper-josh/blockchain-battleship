@@ -1,4 +1,13 @@
 module.exports = {
-  // See <http://truffleframework.com/docs/advanced/configuration>
-  // to customize your Truffle configuration!
+  migrations_directory: "./migrations",
+  networks: {
+    development: {
+      host: "localhost",
+      port: 9545,   // truffle develop
+      network_id: "*"
+    }
+  },
+  mocha: {
+    useColors: true
+  }
 };
