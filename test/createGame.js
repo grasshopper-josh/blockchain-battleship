@@ -19,7 +19,7 @@ contract('JS: Game Creation', function (accounts) {
 			})
 			.then(function (game) {
 				assert.equal(accounts[0], game[0].valueOf(), "Player one does not match");
-				assert.equal(emptyAddress, game[1].valueOf(), "Player one does not match");
+				assert.equal(emptyAddress, game[1].valueOf(), "Player two is not empty");
 				assert.equal("OPEN", game[6].valueOf(), "Game must start in OPEN state");
 				assert.equal(bet, game[9].valueOf(), "Game bet not set");
 			});

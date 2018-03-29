@@ -13,7 +13,6 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   PlayerState[] public playerStates;
   mapping(address => uint[]) public playerGames;
 
-
   // ==============================================================================================
   // GAME FINANCES
   // ==============================================================================================
@@ -131,12 +130,13 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// @param _gameId - GameId for game that will be cancelled
   /// @param _attackPosition - GameId for game that will be cancelled
   function attackPosition(uint _gameId, uint _attackPosition) public onlyGamePlayers(_gameId) {
-    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
     
     require(
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P2));
+
+    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
 
       // Short-circuit
     if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK_WAITING_P2))
@@ -148,7 +148,6 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     // Safe to assume player is either 1 or 2, thanks to onlyGamePlayers modifier
     string memory stateUpdate;
     uint playerStateId;
-    bool playerHasAttack = playerStates[playerStateId].attacks.length < games[_gameId].round;
 
     if (player == 1) {
       stateUpdate = GAME_STATE_ATTACK_WAITING_P2;
@@ -158,18 +157,16 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
       playerStateId = games[_gameId].playerTwoStateId;      
     }
 
-    if (playerHasAttack) {
+    playerStates[playerStateId].attacks.push(_attackPosition);
 
-      playerStates[playerStateId].attacks.push(_attackPosition);
-
-      if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
-        games[_gameId].gameState = stateUpdate;
-      } else {
-        games[_gameId].gameState = GAME_STATE_EVAL;
-        games[_gameId].stateStarted = now;
-        GameEvalStartedEvent(_gameId);
-      }
+    if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_ATTACK)) {
+      games[_gameId].gameState = stateUpdate;
+    } else {
+      games[_gameId].gameState = GAME_STATE_EVAL;
+      games[_gameId].stateStarted = now;
+      GameEvalStartedEvent(_gameId);
     }
+
     
   }
 
@@ -180,13 +177,13 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// @param _attackPosition - GameId for game that will be cancelled
   /// @param _hit - GameId for game that will be cancelled
   function evaluateAttack(uint _gameId, uint _attackPosition, bool _hit) public onlyGamePlayers(_gameId) {
-    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
     
     require(
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2));
 
+    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
 
     // Short-circuit
     if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_EVAL_WAITING_P2))
@@ -233,13 +230,13 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   }
 
   function revealPositions(uint _gameId, string _salt, uint[10] _positions) public onlyGamePlayers(_gameId) {
-    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
     
     require(
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL) || 
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P1) ||
       keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2));
     
+    uint player = _playerOneOrplayerTwo(_gameId, msg.sender);
 
     // Short-circuit
     if (player == 1 && keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL_WAITING_P2))
@@ -264,7 +261,6 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     playerStates[playerStateId].boatPositions = _positions;
     playerStates[playerStateId].cheated = _playerCheated(playerStateId);
 
-
     if (keccak256(games[_gameId].gameState) == keccak256(GAME_STATE_REVEAL)) {
       
       games[_gameId].gameState = stateUpdate;
@@ -288,7 +284,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
         _payoutFunds(games[_gameId].playerOne, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
         _payoutFunds(games[_gameId].playerTwo, games[_gameId].winner, games[_gameId].bet, TOURNAMENT_FEE);
 
-      }else if (playerTwoState.cheated) {
+      } else if (playerTwoState.cheated) {
         games[_gameId].outcome = GAME_OUTCOME_WIN;
         games[_gameId].winner = games[_gameId].playerOne;
 
