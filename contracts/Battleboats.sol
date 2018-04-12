@@ -35,11 +35,11 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// @notice All you need to create a game is thye amount you want to bet.
   ///
   /// @dev PlayerOne will be the game 'owner'. When a game is started only one PlayerState is 
-  /// created. If both player states are created, playerOns is carrying more of the game costs 
+  /// created. If both player states are created, playerOne is carrying more of the game costs 
   /// than needed 
   ///
   /// @param _bet - Amount you are willing to bet
-  /// @param _boardHash - The board hash is required before the game can be started. If this is  
+  /// @param _boardHash - The board hash is required before the game can be started. If this 
   /// hash cannot be reproduced at the end of the game, you lose by default. 
   function createGame(uint _bet, uint _boardHash) payable public returns(uint) {
     
@@ -74,12 +74,12 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
 
   /// @notice Join by providing a GameId
   ///
-  /// @dev This should be changed to 'randomly' match up people. You should only have to input a 
-  /// the maximum amount you are willing to bet. If not players cam n play against "themselfs" to 
+  /// @dev This should be changed to 'randomly' match up people. You should only have to input
+  /// the maximum amount you are willing to bet. If not players can play against "themselves" to 
   /// to boost their rankings.
   ///
   /// @param _gameId - 
-  /// @param _boardHash - The board hash is required before the game can be started. If this is  
+  /// @param _boardHash - The board hash is required before the game can be started. If this
   /// hash cannot be reproduced at the end of the game, you lose by default. 
   function joinGame(uint _gameId, uint _boardHash) payable public {
     
@@ -103,7 +103,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     GameAttackStartedEvent(_gameId);
   }
 
-  /// @notice Cancel a game to release funds. A 1% cancellation fee with be charged, which
+  /// @notice Cancel a game to release funds. A 1% cancellation fee will be charged, which
   /// goes to the tournament fund.
   /// 
   /// @param _gameId - GameId for game that will be cancelled
@@ -121,14 +121,14 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     
   }
 
-  /// @notice Launch an attack on a position for a spesific game. A player is only allowed
+  /// @notice Launch an attack on a position for a specific game. A player is only allowed
   /// one attack per round :) Invalid positions will be recorded, but not taken into account
   /// during the scoring round.
   /// 
   /// @dev dev
   ///
-  /// @param _gameId - GameId for game that will be cancelled
-  /// @param _attackPosition - GameId for game that will be cancelled
+  /// @param _gameId - GameId for game that the player is attacking in
+  /// @param _attackPosition - position on board that the player wants to attack
   function attackPosition(uint _gameId, uint _attackPosition) public onlyGamePlayers(_gameId) {
     
     require(
@@ -173,9 +173,9 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// @notice Give feedback on the previous attack, lying will catch up with you, not sure how
   /// but I'm sure it will.
   /// 
-  /// @param _gameId - GameId for game that will be cancelled
-  /// @param _attackPosition - GameId for game that will be cancelled
-  /// @param _hit - GameId for game that will be cancelled
+  /// @param _gameId - GameId for game that the attack is being evaluated in
+  /// @param _attackPosition - position of the attack that is being evaluated
+  /// @param _hit - whether or not the attack position hits a boat
   function evaluateAttack(uint _gameId, uint _attackPosition, bool _hit) public onlyGamePlayers(_gameId) {
     
     require(
@@ -344,7 +344,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
 
   /// @notice This method MUST be used to calculate a board hash. Keep the inputs private and make
   /// sure not to change them. If the game cannot confirm your board hash at the end of the game,
-  /// you loose by default.
+  /// you lose by default.
   /// 
   /// @param _salt - This should be a unique string and will help protect the boardHash from being
   /// "brute-forced".
@@ -362,7 +362,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     return hash;
   }
 
-  /// @notice This will help to make sure you are not providing an invalid set of positions and 
+  /// @notice This will help to make sure you are not providing an invalid set of positions and therefore will
   /// be disqualified at the end of the game.
   /// 
   /// @param _positions - The positions where boats are located. The order is not important, but
@@ -416,7 +416,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     return game.round == MAX_GAME_LENGHT_IN_ROUNDS || playerStates[playerOneStateId].hits.length == 10 || playerStates[playerTwoStateId].hits.length == 10;
   }
 
-  /// @dev Checks if the supplied salt and boat positions matches the hash
+  /// @dev Checks if the supplied salt and boat positions match the hash
   /// supplied during the game join.
   ///
   /// @param _playerStateId - The state to test for cheating
@@ -430,8 +430,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
     return boardHash != playerState.boardHash || !boardValid;
   }
 
-  /// @dev Checks if the supplied salt and boat positions matches the hash
-  /// supplied during the game join.
+  /// @dev Calculates the score of a player in a game.
   ///
   /// @param _thisPlayer - The state of the player you need the score for
   /// @param _otherPlayer - The state of other player, for reference
