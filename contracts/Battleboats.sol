@@ -32,7 +32,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   event GameCancelledEvent(uint _gameId);
 
 
-  /// @notice All you need to create a game is thye amount you want to bet.
+  /// @notice All you need to create a game is the amount you want to bet.
   ///
   /// @dev PlayerOne will be the game 'owner'. When a game is started only one PlayerState is 
   /// created. If both player states are created, playerOne is carrying more of the game costs 
@@ -74,7 +74,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
 
   /// @notice Join by providing a GameId
   ///
-  /// @dev This should be changed to 'randomly' match up people. You should only have to input
+  /// @dev This should be changed to 'randomly' match people. You should only have to input
   /// the maximum amount you are willing to bet. If not players can play against "themselves" to 
   /// to boost their rankings.
   ///
@@ -349,7 +349,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// @param _salt - This should be a unique string and will help protect the boardHash from being
   /// "brute-forced".
   /// @param _positions - The positions where boats are located. The order is not important, but
-  /// the same order must be supplied at the end of the game to reporduce the hash. A position must
+  /// the same order must be supplied at the end of the game to reproduce the hash. A position must
   /// be between 0 and 99. 0 <= position <= 99 
   function getHash(string _salt, uint[10] _positions) public pure returns(uint) {
     
@@ -366,7 +366,7 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   /// be disqualified at the end of the game.
   /// 
   /// @param _positions - The positions where boats are located. The order is not important, but
-  /// the same order must be supplied at the end of the game to reporduce the hash. A position must
+  /// the same order must be supplied at the end of the game to reproduce the hash. A position must
   /// be between 0 and 99. 0 <= position <= 99
   function testBoardValidity(uint[10] _positions) public pure returns(bool) {
 
@@ -407,7 +407,6 @@ contract Battleboats is Ownable, BattleboatsStates, BattleboatsEnums {
   // PRIVATE METHODS
   // ==============================================================================================
 
-  /// @dev Dev comment here
   /// @param _gameId - game to finish off
   function _isGameFinished(uint _gameId) internal view returns (bool) {
     Game memory game = games[_gameId];
